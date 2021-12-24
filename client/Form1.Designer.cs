@@ -35,6 +35,8 @@ namespace voicelab_test
             this.nameTextBox = new System.Windows.Forms.TextBox();
             this.joinServer = new System.Windows.Forms.Button();
             this.sendPanel = new System.Windows.Forms.Panel();
+            this.button2 = new System.Windows.Forms.Button();
+            this.leaveBtn = new System.Windows.Forms.Button();
             this.sendBtn = new System.Windows.Forms.Button();
             this.sendTextBox = new System.Windows.Forms.TextBox();
             this.connectionPanel.SuspendLayout();
@@ -44,9 +46,9 @@ namespace voicelab_test
             // chatBox
             // 
             this.chatBox.AccessibleName = "";
-            this.chatBox.Location = new System.Drawing.Point(12, 12);
+            this.chatBox.Location = new System.Drawing.Point(12, 47);
             this.chatBox.Name = "chatBox";
-            this.chatBox.Size = new System.Drawing.Size(776, 325);
+            this.chatBox.Size = new System.Drawing.Size(776, 290);
             this.chatBox.TabIndex = 1;
             this.chatBox.Text = "";
             // 
@@ -95,6 +97,8 @@ namespace voicelab_test
             // 
             // sendPanel
             // 
+            this.sendPanel.Controls.Add(this.button2);
+            this.sendPanel.Controls.Add(this.leaveBtn);
             this.sendPanel.Controls.Add(this.sendBtn);
             this.sendPanel.Controls.Add(this.sendTextBox);
             this.sendPanel.Location = new System.Drawing.Point(12, 340);
@@ -102,9 +106,28 @@ namespace voicelab_test
             this.sendPanel.Size = new System.Drawing.Size(776, 95);
             this.sendPanel.TabIndex = 3;
             // 
+            // button2
+            // 
+            this.button2.Location = new System.Drawing.Point(628, 37);
+            this.button2.Name = "button2";
+            this.button2.Size = new System.Drawing.Size(130, 23);
+            this.button2.TabIndex = 3;
+            this.button2.Text = "PUT SERVER DOWN";
+            this.button2.UseVisualStyleBackColor = true;
+            // 
+            // leaveBtn
+            // 
+            this.leaveBtn.Location = new System.Drawing.Point(523, 37);
+            this.leaveBtn.Name = "leaveBtn";
+            this.leaveBtn.Size = new System.Drawing.Size(99, 23);
+            this.leaveBtn.TabIndex = 2;
+            this.leaveBtn.Text = "LEAVE";
+            this.leaveBtn.UseVisualStyleBackColor = true;
+            this.leaveBtn.Click += new System.EventHandler(this.leaveBtn_Click);
+            // 
             // sendBtn
             // 
-            this.sendBtn.Location = new System.Drawing.Point(665, 37);
+            this.sendBtn.Location = new System.Drawing.Point(418, 37);
             this.sendBtn.Name = "sendBtn";
             this.sendBtn.Size = new System.Drawing.Size(99, 23);
             this.sendBtn.TabIndex = 1;
@@ -116,8 +139,9 @@ namespace voicelab_test
             // 
             this.sendTextBox.Location = new System.Drawing.Point(4, 37);
             this.sendTextBox.Name = "sendTextBox";
-            this.sendTextBox.Size = new System.Drawing.Size(654, 23);
+            this.sendTextBox.Size = new System.Drawing.Size(408, 23);
             this.sendTextBox.TabIndex = 0;
+            this.sendTextBox.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.sendTextBox_KeyPress);
             // 
             // Form1
             // 
@@ -147,6 +171,8 @@ namespace voicelab_test
         private System.Windows.Forms.Panel sendPanel;
         private System.Windows.Forms.Button sendBtn;
         private System.Windows.Forms.TextBox sendTextBox;
+        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button leaveBtn;
     }
 }
 

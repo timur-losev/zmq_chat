@@ -34,10 +34,8 @@ namespace server
                     var newClient = JsonSerializer.Deserialize<ConnectionRequest>(payload);
 
                     // Format "joined" message
-                    var newLine = "[" + DateTime.Now.ToShortDateString() + "] " + newClient.UserName + " joined.\n";
+                    var newLine = "[" + DateTime.Now.ToShortTimeString() + "] " + newClient.UserName + " joined.\n";
                     history += newLine;
-
-                    notifySubs = true;
 
                     Console.WriteLine(newLine);
 
@@ -50,21 +48,42 @@ namespace server
                     // Accept the client and send back the chat history
                     communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kAcceptedClientCMD, JsonSerializer.Serialize(acceptedClient)));
 
+                    // Send history to subs
+                    notifySubs = true;
                     break;
 
                 case NetworkCommands.kSendMessageCMD:
                     var newMessage = JsonSerializer.Deserialize<SendMessageRequest>(payload);
 
                     // Format message
-                    newMessage.MessageText = "[" + DateTime.Now.ToShortDateString() + "] " + newMessage.MessageText + "\n";
+                    newMessage.MessageText = "[" + DateTime.Now.ToShortTimeString() + "] " + newMessage.MessageText + "\n";
                     Console.WriteLine(newMessage.MessageText);
 
                     history += newMessage.MessageText;
 
                     communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kServerGotTheMessage, ""));
 
+                    // Send history to subs
                     notifySubs = true;
                     break;
+
+                case NetworkCommands.kLeaveTheServerCMD:
+                    {
+                        var leaver = JsonSerializer.Deserialize<LeaveRequest>(payload);
+
+                        // Format "disconnected" message
+                        var line = "[" + DateTime.Now.ToShortTimeString() + "] " + leaver.UserName + " disconnected.\n";
+                        history += line;
+
+                        Console.WriteLine(line);
+
+                        communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kLeaveTheServerCMD, ""));
+
+                        // Send history to subs
+                        notifySubs = true;
+
+                        break;
+                    }
             }
         }
 
@@ -90,7 +109,14 @@ namespace server
         {
             using (var handShakeSocket = new ResponseSocket())
             {
-                handShakeSocket.Bind("tcp://*:3366");
+                // Read command line args to determine the port number
+                var handShakePort = "3366";
+                if (args.Length == 1)
+                {
+                    handShakePort = args[0].Substring(1);
+                }
+
+                handShakeSocket.Bind("tcp://*:" + handShakePort);
 
                 using (var chatRoomSocket = new PublisherSocket())
                 {

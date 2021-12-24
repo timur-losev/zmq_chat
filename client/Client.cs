@@ -39,8 +39,8 @@ namespace voicelab_test
         private static string messagePort = "";
         private static string displayName = "";
 
-        private static CancellationTokenSource ctsconnection = new CancellationTokenSource();
-        private static CancellationTokenSource ctsmessagepipe = new CancellationTokenSource();
+        private static CancellationTokenSource ctsconnection = null;
+        private static CancellationTokenSource ctsmessagepipe = null;
 
         public static EventHandler<ClientEventArgs> OnNewMessage;
 
@@ -51,7 +51,8 @@ namespace voicelab_test
         {
             using (var requester = new RequestSocket())
             {
-                requester.Connect(String.Format("tcp://localhost:{0}", port));
+                var endpoint = String.Format("tcp://localhost:{0}", port);
+                requester.Connect(endpoint);
 
                 Thread.Sleep(500);
 
@@ -107,6 +108,30 @@ namespace voicelab_test
                                     requester.ReceiveFrameString(out more);
 
                                 break;
+
+                            case NetworkCommands.kLeaveTheServerCMD:
+                                var msg = new LeaveRequest
+                                {
+                                    UserName = Client.displayName
+                                };
+                                payload = JsonSerializer.Serialize(msg);
+
+                                requester.SendMoreFrame(NetworkCommands.kLeaveTheServerCMD).SendFrame(payload);
+
+                                more = false;
+                                cmd = requester.ReceiveFrameString(out more);
+
+                                Debug.Assert(cmd == NetworkCommands.kLeaveTheServerCMD);
+
+                                // No operation, just fulfilling ZMQ state machine
+                                while (more)
+                                    requester.ReceiveFrameString(out more);
+
+                                requester.Disconnect(endpoint);
+                                ctsmessagepipe.Cancel();
+                                ctsconnection.Cancel();
+                                // Return from the thread
+                                return;
                         }
                     }
                 }
@@ -140,8 +165,16 @@ namespace voicelab_test
             }
         }
 
+        public static void LeaveTheServer()
+        {
+            communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kLeaveTheServerCMD, ""));
+        }
+
         public static bool Connect(string displayName, string port)
         {
+            ctsconnection = new CancellationTokenSource();
+            ctsmessagepipe = new CancellationTokenSource();
+
             Client.messagePort = "";
             Client.displayName = displayName;
             ThreadPool.QueueUserWorkItem(new WaitCallback((Object obj) => {

@@ -72,13 +72,16 @@ namespace voicelab_test
                 }
             }
 
-            if (nameTextBox.Text != YOUR_NAME && nameTextBox.Text.Length <= 20 && nameTextBox.Text.Length >= 3)
+            if (nameTextBox.Text != YOUR_NAME && nameTextBox.Text.Length <= 20 && nameTextBox.Text.Length > 0)
             {
                 Client.OnNewMessage += new EventHandler<ClientEventArgs>(OnNewMessage);
 
                 if (Client.Connect(nameTextBox.Text, portTextBox.Text))
                 {
                     connectionPanel.Visible = false;
+
+                    // Set the capture to user's name
+                    this.Text = nameTextBox.Text;
                 }
                 else
                 {
@@ -97,7 +100,23 @@ namespace voicelab_test
             if (sendTextBox.Text.Length > 0)
             {
                 Client.SendMessage(sendTextBox.Text);
+                sendTextBox.Text = "";
             }
+        }
+
+        private void sendTextBox_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == '\r' && sendTextBox.Text.Length > 0)
+            {
+                Client.SendMessage(sendTextBox.Text);
+                sendTextBox.Text = "";
+            }
+        }
+
+        private void leaveBtn_Click(object sender, EventArgs e)
+        {
+            Client.LeaveTheServer();
+            connectionPanel.Visible = true;
         }
     }
 }
