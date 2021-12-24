@@ -1,0 +1,7 @@
+.vs/
+client/bin/
+client/obj/
+common/bin/
+common/obj/
+server/bin/
+server/obj/
