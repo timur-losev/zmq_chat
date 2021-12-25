@@ -1,7 +1,7 @@
 ﻿
-namespace voicelab_test
+namespace voicemod_test
 {
-    partial class Form1
+    partial class MainWindow
     {
         /// <summary>
         ///  Required designer variable.
@@ -35,7 +35,7 @@ namespace voicelab_test
             this.nameTextBox = new System.Windows.Forms.TextBox();
             this.joinServer = new System.Windows.Forms.Button();
             this.sendPanel = new System.Windows.Forms.Panel();
-            this.button2 = new System.Windows.Forms.Button();
+            this.shutDownServer = new System.Windows.Forms.Button();
             this.leaveBtn = new System.Windows.Forms.Button();
             this.sendBtn = new System.Windows.Forms.Button();
             this.sendTextBox = new System.Windows.Forms.TextBox();
@@ -97,7 +97,7 @@ namespace voicelab_test
             // 
             // sendPanel
             // 
-            this.sendPanel.Controls.Add(this.button2);
+            this.sendPanel.Controls.Add(this.shutDownServer);
             this.sendPanel.Controls.Add(this.leaveBtn);
             this.sendPanel.Controls.Add(this.sendBtn);
             this.sendPanel.Controls.Add(this.sendTextBox);
@@ -106,14 +106,15 @@ namespace voicelab_test
             this.sendPanel.Size = new System.Drawing.Size(776, 95);
             this.sendPanel.TabIndex = 3;
             // 
-            // button2
+            // shutDownServer
             // 
-            this.button2.Location = new System.Drawing.Point(628, 37);
-            this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(130, 23);
-            this.button2.TabIndex = 3;
-            this.button2.Text = "PUT SERVER DOWN";
-            this.button2.UseVisualStyleBackColor = true;
+            this.shutDownServer.Location = new System.Drawing.Point(628, 37);
+            this.shutDownServer.Name = "shutDownServer";
+            this.shutDownServer.Size = new System.Drawing.Size(130, 23);
+            this.shutDownServer.TabIndex = 3;
+            this.shutDownServer.Text = "SHUT DOWN SERVER ";
+            this.shutDownServer.UseVisualStyleBackColor = true;
+            this.shutDownServer.Click += new System.EventHandler(this.shutDownServer_Click);
             // 
             // leaveBtn
             // 
@@ -153,6 +154,8 @@ namespace voicelab_test
             this.Controls.Add(this.chatBox);
             this.Name = "Form1";
             this.Text = "Form1";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
+            this.Shown += new System.EventHandler(this.Form1_Shown);
             this.connectionPanel.ResumeLayout(false);
             this.connectionPanel.PerformLayout();
             this.sendPanel.ResumeLayout(false);
@@ -171,7 +174,7 @@ namespace voicelab_test
         private System.Windows.Forms.Panel sendPanel;
         private System.Windows.Forms.Button sendBtn;
         private System.Windows.Forms.TextBox sendTextBox;
-        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button shutDownServer;
         private System.Windows.Forms.Button leaveBtn;
     }
 }

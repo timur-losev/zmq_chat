@@ -10,8 +10,9 @@ using System.Text.Json;
 using common;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Net.Sockets;
 
-namespace voicelab_test
+namespace voicemod_test
 {
     class TheTest
     {
@@ -19,12 +20,12 @@ namespace voicelab_test
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            var form = new Form1();
+            var form = new MainWindow();
             Application.Run(form);
         }
     }
 
-    class ClientEventArgs: EventArgs
+    class ClientEventArgs : EventArgs
     {
         public string MessageText;
 
@@ -34,63 +35,79 @@ namespace voicelab_test
         }
     }
 
+    enum ConnectionState
+    {
+        CONNECTING,
+        CONNECTED,
+        NOTCONNECTED
+    }
+
     class Client
     {
-        private static string messagePort = "";
-        private static string displayName = "";
+        private string messagePort = "";
+        private string displayName = "";
 
-        private static CancellationTokenSource ctsconnection = null;
-        private static CancellationTokenSource ctsmessagepipe = null;
+        private CancellationTokenSource ctsconnection = null;
+        private CancellationTokenSource ctsmessagepipe = null;
 
-        public static EventHandler<ClientEventArgs> OnNewMessage;
+        private RequestSocket requester = null;
+        private SubscriberSocket chatRoomSocket = null;
+        private bool bStopReqRepSignal = false;
+
+        private string reqRepEndPoint = "";
+        private string messagePipeEndpoint = "";
+        private ConnectionState connectionState = ConnectionState.CONNECTING;
+
+        public EventHandler<ClientEventArgs> OnNewMessage;
+        public EventHandler<ClientEventArgs> OnServerDisconnected;
 
         // Concurrent queue for communication across threads
-        static ConcurrentQueue<KeyValuePair<string, string>> communicationQueue = new ConcurrentQueue<KeyValuePair<string, string>>();
+        ConcurrentQueue<KeyValuePair<string, string>> communicationQueue = new ConcurrentQueue<KeyValuePair<string, string>>();
 
-        private static void ConnectionWorker(string displayName, string port)
+        private void CloseAllConnections()
         {
-            using (var requester = new RequestSocket())
+            bStopReqRepSignal = true;
+
+            if (ctsmessagepipe != null)
+                ctsmessagepipe.Cancel();
+
+            if (ctsconnection != null)
+                ctsconnection.Cancel();
+
+
+            if (requester != null)
             {
-                var endpoint = String.Format("tcp://localhost:{0}", port);
-                requester.Connect(endpoint);
+                requester.Dispose();
+                requester = null;
+            }
 
-                Thread.Sleep(500);
+            if (chatRoomSocket != null)
+            {
+                chatRoomSocket.Dispose();
+                chatRoomSocket = null;
+            }
 
-                Debug.Assert(requester.HasOut);
+            communicationQueue.Clear();
 
-                var connectionReq = new ConnectionRequest
+            bStopReqRepSignal = false;
+        }
+
+        private void ProcessReqRepMessages()
+        {
+            var payload = "";
+            var cmd = "";
+            var more = false;
+
+            while (!bStopReqRepSignal)
+            {
+                KeyValuePair<string, string> command;
+                if (communicationQueue.TryDequeue(out command))
                 {
-                    UserName = displayName
-                };
-
-                var payload = JsonSerializer.Serialize(connectionReq);
-
-                requester.SendMoreFrame(NetworkCommands.kHelloKittyCMD).SendFrame(payload);
-
-                bool more = false;
-                var cmd = requester.ReceiveFrameString(out more);
-
-                payload = "";
-                if (cmd == NetworkCommands.kAcceptedClientCMD)
-                {
-                    while (more)
-                        payload += requester.ReceiveFrameString(out more);
-                }
-
-                var connectionResponse = JsonSerializer.Deserialize<AcceptedClient>(payload);
-                messagePort = connectionResponse.MessagingPort;
-
-                OnNewMessage(null, new ClientEventArgs(connectionResponse.ChatHistory));
-
-                while (true)
-                {
-                    KeyValuePair<string, string> command;
-                    if (communicationQueue.TryDequeue(out command))
+                    switch (command.Key)
                     {
-                        switch (command.Key)
-                        {
-                            case NetworkCommands.kSendMessageCMD:
-                                var sendMessage = new SendMessageRequest
+                        case NetworkCommands.kSendMessageCMD:
+                            {
+                                var sendMessage = new MessagePacket
                                 {
                                     MessageText = command.Value
                                 };
@@ -108,11 +125,13 @@ namespace voicelab_test
                                     requester.ReceiveFrameString(out more);
 
                                 break;
+                            }
 
-                            case NetworkCommands.kLeaveTheServerCMD:
+                        case NetworkCommands.kLeaveTheServerCMD:
+                            {
                                 var msg = new LeaveRequest
                                 {
-                                    UserName = Client.displayName
+                                    UserName = displayName
                                 };
                                 payload = JsonSerializer.Serialize(msg);
 
@@ -121,43 +140,121 @@ namespace voicelab_test
                                 more = false;
                                 cmd = requester.ReceiveFrameString(out more);
 
+                                // Server accepted our leave
                                 Debug.Assert(cmd == NetworkCommands.kLeaveTheServerCMD);
 
                                 // No operation, just fulfilling ZMQ state machine
                                 while (more)
                                     requester.ReceiveFrameString(out more);
 
-                                requester.Disconnect(endpoint);
                                 ctsmessagepipe.Cancel();
-                                ctsconnection.Cancel();
-                                // Return from the thread
+
+                                // Return from the worker thread
                                 return;
-                        }
+                            }
+
+                        case NetworkCommands.kShutDownServerCMD:
+                            {
+                                requester.SendFrame(NetworkCommands.kShutDownServerCMD);
+                                break;
+                            }
                     }
+
+
+                    Thread.Sleep(100);
                 }
             }
         }
 
-        public static void MessagePipeWorker()
+        private void ConnectionWorker(string displayName, string port)
         {
-            using (var chatRoomSocket = new SubscriberSocket())
+            requester = new RequestSocket();
+
+            reqRepEndPoint = String.Format("tcp://localhost:{0}", port);
+
+            requester.Connect(reqRepEndPoint);
+
+            Thread.Sleep(500);
+
+            Debug.Assert(requester.HasOut);
+
+            var connectionReq = new ConnectionRequest
             {
-                chatRoomSocket.Connect("tcp://localhost:" + Client.messagePort);
-                chatRoomSocket.SubscribeToAnyTopic();
+                UserName = displayName
+            };
 
-                while (true)
+            var payload = JsonSerializer.Serialize(connectionReq);
+
+            requester.SendMoreFrame(NetworkCommands.kHelloKittyCMD).SendFrame(payload);
+
+            bool more = false;
+            var cmd = "";
+            // Try a positive response. Timeout is 2 secs
+            if (requester.TryReceiveFrameString(TimeSpan.FromSeconds(2), out cmd, out more))
+            {
+                payload = "";
+                if (cmd == NetworkCommands.kAcceptedClientCMD)
                 {
-                    var newMessage = chatRoomSocket.ReceiveFrameString();
-
-                    OnNewMessage(null, new ClientEventArgs(newMessage));
+                    while (more)
+                        payload += requester.ReceiveFrameString(out more);
                 }
+
+                var connectionResponse = JsonSerializer.Deserialize<AcceptedClient>(payload);
+                // Server returns a messaging port and chat history
+                messagePort = connectionResponse.MessagingPort;
+                connectionState = ConnectionState.CONNECTED;
+
+                OnNewMessage(null, new ClientEventArgs(connectionResponse.ChatHistory));
+
+                ProcessReqRepMessages();
+            }
+
+            connectionState = ConnectionState.NOTCONNECTED;
+        }
+
+        private async Task MessagePipeWorkerAsync()
+        {
+            chatRoomSocket = new SubscriberSocket();
+
+            messagePipeEndpoint = "tcp://localhost:" + messagePort;
+            chatRoomSocket.Connect(messagePipeEndpoint);
+            chatRoomSocket.SubscribeToAnyTopic();
+
+            while (true)
+            {
+                var (cmd, more) = await chatRoomSocket.ReceiveFrameStringAsync();
+
+                switch (cmd)
+                {
+                    case NetworkCommands.kNewMessageCMD:
+                        {
+                            var payload = "";
+                            while (more)
+                                payload += chatRoomSocket.ReceiveFrameString(out more);
+
+                            var newMessage = JsonSerializer.Deserialize<MessagePacket>(payload);
+
+                            OnNewMessage(null, new ClientEventArgs(newMessage.MessageText));
+                            break;
+                        }
+                    case NetworkCommands.kShutDownServerCMD:
+                        {
+                            OnNewMessage(null, new ClientEventArgs("SERVER HAS BEEN SHUT DOWN"));
+
+                            if (OnServerDisconnected != null)
+                                OnServerDisconnected(null, null);
+
+                            return;
+                        }
+                }
+
+                Thread.Sleep(500);
             }
         }
 
-        public static void SendMessage(string messageText)
+        public void SendChatMessage(string messageText)
         {
-            // Simple check if we connected
-            if (messagePort.Length > 0)
+            if (connectionState == ConnectionState.CONNECTED)
             {
                 // Sending message
                 // User's display name is backed into the message
@@ -165,30 +262,53 @@ namespace voicelab_test
             }
         }
 
-        public static void LeaveTheServer()
+        public void SendLeaveTheServer()
         {
-            communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kLeaveTheServerCMD, ""));
+            if (connectionState == ConnectionState.CONNECTED)
+            {
+                communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kLeaveTheServerCMD, ""));
+            }
         }
 
-        public static bool Connect(string displayName, string port)
+        public void SendServerShutdown()
         {
-            ctsconnection = new CancellationTokenSource();
-            ctsmessagepipe = new CancellationTokenSource();
+            if (connectionState == ConnectionState.CONNECTED)
+            {
+                communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kShutDownServerCMD, ""));
+            }
+        }
+        public bool Connect(string displayName, string port)
+        {
+            CloseAllConnections();
 
-            Client.messagePort = "";
-            Client.displayName = displayName;
-            ThreadPool.QueueUserWorkItem(new WaitCallback((Object obj) => {
-                Client.ConnectionWorker(displayName, port);
+            connectionState = ConnectionState.CONNECTING;
+
+            messagePort = "";
+            this.displayName = displayName;
+
+            ctsconnection = new CancellationTokenSource();
+
+            ThreadPool.QueueUserWorkItem(new WaitCallback((Object obj) =>
+            {
+                ConnectionWorker(displayName, port);
             }), ctsconnection.Token);
 
-            // Connection timeout
-            Thread.Sleep(1500);
+            while (connectionState == ConnectionState.CONNECTING)
+            {
+                Thread.Sleep(10);
+            }
 
-            if (Client.messagePort.Length > 0) {
+            if (messagePort.Length > 0 && connectionState == ConnectionState.CONNECTED)
+            {
+                ctsmessagepipe = new CancellationTokenSource();
+
                 ThreadPool.QueueUserWorkItem(new WaitCallback((Object obj) =>
                 {
-                    Client.MessagePipeWorker();
-                }), ctsmessagepipe.Token);
+                    using (var runtime = new NetMQRuntime())
+                    {
+                        runtime.Run(ctsmessagepipe.Token, MessagePipeWorkerAsync());
+                    }
+                }));
 
                 return true;
             }
@@ -196,7 +316,7 @@ namespace voicelab_test
             {
                 // Connection time out
                 // Break the connection task
-                ctsconnection.Cancel();
+                CloseAllConnections();
             }
 
             return false;
