@@ -8,29 +8,6 @@ using System.Collections.Generic;
 
 namespace server
 {
-    class SendingMessageLine
-    {
-        bool ready = false;
-        public bool Ready
-        {
-            get { return ready; }
-        }
-
-        string messageText = "";
-        
-        public string Consume()
-        {
-            ready = false;
-            return messageText;
-        }
-
-        public void Prepare(string text)
-        {
-            ready = true;
-            messageText = text;
-        }
-    }
-
     class Server
     {
         static string messagePort = "0";
@@ -40,8 +17,9 @@ namespace server
         static NetMQPoller poller = null;
 
         static Queue<KeyValuePair<string, string>> communicationQueue = new Queue<KeyValuePair<string, string>>();
-        static SendingMessageLine sendingLine = new SendingMessageLine();
+        static string broadcastBuffer = "";
 
+        // A communication pipe between Server and Client
         static void repSocket_ReceiveReady(object sender, NetMQSocketEventArgs e)
         {
             var more = false;
@@ -55,6 +33,7 @@ namespace server
 
             switch (cmd)
             {
+                // New Client received 
                 case NetworkCommands.kHelloKittyCMD:
                     {
                         var newClient = JsonSerializer.Deserialize<ConnectionRequest>(payload);
@@ -62,7 +41,7 @@ namespace server
                         // Format "joined" message
                         var newLine = "[" + DateTime.Now.ToShortTimeString() + "] " + newClient.UserName + " joined.\n";
                         history += newLine;
-                        sendingLine.Prepare(newLine);
+                        broadcastBuffer = newLine;
 
                         Console.WriteLine(newLine);
 
@@ -78,6 +57,7 @@ namespace server
                         break;
                     }
 
+                // Client sending a message, Server transmits that message to the PUB socket
                 case NetworkCommands.kSendMessageCMD:
                     {
                         var newMessage = JsonSerializer.Deserialize<MessagePacket>(payload);
@@ -86,7 +66,7 @@ namespace server
                         newMessage.MessageText = "[" + DateTime.Now.ToShortTimeString() + "] " + newMessage.MessageText + "\n";
                         Console.WriteLine(newMessage.MessageText);
 
-                        sendingLine.Prepare(newMessage.MessageText);
+                        broadcastBuffer = newMessage.MessageText;
                         history += newMessage.MessageText;
 
                         communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kServerGotTheMessage, ""));
@@ -94,6 +74,7 @@ namespace server
                         break;
                     }
 
+                // Client intentionally disconnected
                 case NetworkCommands.kLeaveTheServerCMD:
                     {
                         var leaver = JsonSerializer.Deserialize<LeaveRequest>(payload);
@@ -101,7 +82,7 @@ namespace server
                         // Format "disconnected" message
                         var line = "[" + DateTime.Now.ToShortTimeString() + "] " + leaver.UserName + " disconnected.\n";
                         history += line;
-                        sendingLine.Prepare(line);
+                        broadcastBuffer = line;
 
                         Console.WriteLine(line);
 
@@ -112,6 +93,7 @@ namespace server
 
                 case NetworkCommands.kShutDownServerCMD:
                     {
+                        // Server is broadcasting "shutdown" signal through the message pipe
                         notifyShutdown = true;
                         break;
                     }
@@ -129,12 +111,15 @@ namespace server
 
         static void pubSocket_SendReady(object sender, NetMQSocketEventArgs e)
         {
-            if (sendingLine.Ready)
+            if (broadcastBuffer.Length > 0)
             {
                 var messagePacket = new MessagePacket
                 {
-                    MessageText = sendingLine.Consume()
+                    MessageText = broadcastBuffer
                 };
+
+                // Consume the buffer
+                broadcastBuffer = "";
 
                 e.Socket.SendMoreFrame(NetworkCommands.kNewMessageCMD).SendFrame(JsonSerializer.Serialize(messagePacket));
             }
@@ -164,6 +149,7 @@ namespace server
                 handShakeSocket.Bind("tcp://*:" + handShakePort);
 
                 Console.WriteLine("Starting at port " + handShakePort);
+
 
                 using (var chatRoomSocket = new PublisherSocket())
                 {

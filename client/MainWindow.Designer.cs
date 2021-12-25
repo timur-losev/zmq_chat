@@ -48,12 +48,14 @@ namespace voicemod_test
             this.chatBox.AccessibleName = "";
             this.chatBox.Location = new System.Drawing.Point(12, 47);
             this.chatBox.Name = "chatBox";
+            this.chatBox.ReadOnly = true;
             this.chatBox.Size = new System.Drawing.Size(776, 290);
             this.chatBox.TabIndex = 1;
             this.chatBox.Text = "";
             // 
             // connectionPanel
             // 
+            this.connectionPanel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(128)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
             this.connectionPanel.Controls.Add(this.portTextBox);
             this.connectionPanel.Controls.Add(this.nameTextBox);
             this.connectionPanel.Controls.Add(this.joinServer);
@@ -97,6 +99,7 @@ namespace voicemod_test
             // 
             // sendPanel
             // 
+            this.sendPanel.BackColor = System.Drawing.SystemColors.Control;
             this.sendPanel.Controls.Add(this.shutDownServer);
             this.sendPanel.Controls.Add(this.leaveBtn);
             this.sendPanel.Controls.Add(this.sendBtn);
@@ -144,7 +147,7 @@ namespace voicemod_test
             this.sendTextBox.TabIndex = 0;
             this.sendTextBox.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.sendTextBox_KeyPress);
             // 
-            // Form1
+            // MainWindow
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -152,7 +155,8 @@ namespace voicemod_test
             this.Controls.Add(this.sendPanel);
             this.Controls.Add(this.connectionPanel);
             this.Controls.Add(this.chatBox);
-            this.Name = "Form1";
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.Name = "MainWindow";
             this.Text = "Form1";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Shown += new System.EventHandler(this.Form1_Shown);

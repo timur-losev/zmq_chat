@@ -157,7 +157,7 @@ namespace voicemod_test
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            //Client.LeaveTheServer();
+            chatClient.SendLeaveTheServer();
         }
 
         private void Form1_Shown(object sender, EventArgs e)

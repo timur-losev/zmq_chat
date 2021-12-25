@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.31729.503
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "client", "client\client.csproj", "{C6C428F9-48BD-4F04-8532-5754E0B751C7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "common", "common\common.csproj", "{BA1943FB-6632-422E-99F4-3830D972D05E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "common", "common\common.csproj", "{BA1943FB-6632-422E-99F4-3830D972D05E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetMQ", "netmq\src\NetMQ\NetMQ.csproj", "{0C0E5C38-160B-4BBF-8D45-60A6823FA026}"
 EndProject

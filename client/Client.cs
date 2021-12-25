@@ -56,6 +56,7 @@ namespace voicemod_test
 
         private string reqRepEndPoint = "";
         private string messagePipeEndpoint = "";
+
         private ConnectionState connectionState = ConnectionState.CONNECTING;
 
         public EventHandler<ClientEventArgs> OnNewMessage;
@@ -64,6 +65,7 @@ namespace voicemod_test
         // Concurrent queue for communication across threads
         ConcurrentQueue<KeyValuePair<string, string>> communicationQueue = new ConcurrentQueue<KeyValuePair<string, string>>();
 
+        // Uber close all
         private void CloseAllConnections()
         {
             bStopReqRepSignal = true;
@@ -74,6 +76,7 @@ namespace voicemod_test
             if (ctsconnection != null)
                 ctsconnection.Cancel();
 
+            Thread.Sleep(500);
 
             if (requester != null)
             {
@@ -92,6 +95,7 @@ namespace voicemod_test
             bStopReqRepSignal = false;
         }
 
+        // Process communication between Client and Server
         private void ProcessReqRepMessages()
         {
             var payload = "";
@@ -105,6 +109,7 @@ namespace voicemod_test
                 {
                     switch (command.Key)
                     {
+                        // Send new chat message
                         case NetworkCommands.kSendMessageCMD:
                             {
                                 var sendMessage = new MessagePacket
@@ -126,7 +131,7 @@ namespace voicemod_test
 
                                 break;
                             }
-
+                        // Send disconnection
                         case NetworkCommands.kLeaveTheServerCMD:
                             {
                                 var msg = new LeaveRequest
@@ -153,6 +158,7 @@ namespace voicemod_test
                                 return;
                             }
 
+                        // Send shut down to the server
                         case NetworkCommands.kShutDownServerCMD:
                             {
                                 requester.SendFrame(NetworkCommands.kShutDownServerCMD);
@@ -160,12 +166,13 @@ namespace voicemod_test
                             }
                     }
 
-
+                    // Save CPU
                     Thread.Sleep(100);
                 }
             }
         }
 
+        // Initiate a connection between Client and Server
         private void ConnectionWorker(string displayName, string port)
         {
             requester = new RequestSocket();
@@ -206,12 +213,15 @@ namespace voicemod_test
 
                 OnNewMessage(null, new ClientEventArgs(connectionResponse.ChatHistory));
 
+                // A running loop from here
                 ProcessReqRepMessages();
             }
 
             connectionState = ConnectionState.NOTCONNECTED;
         }
 
+        // An async-pipe to grab broadcast messages
+        // Can be closed by canceling the token
         private async Task MessagePipeWorkerAsync()
         {
             chatRoomSocket = new SubscriberSocket();
@@ -252,16 +262,18 @@ namespace voicemod_test
             }
         }
 
+        // Sending a chat message
+        // User's display name is backed into the message
         public void SendChatMessage(string messageText)
         {
             if (connectionState == ConnectionState.CONNECTED)
             {
-                // Sending message
-                // User's display name is backed into the message
                 communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kSendMessageCMD, displayName + ":" + messageText));
             }
         }
 
+        // Send leave the server command
+        // Client will disconnect automatically
         public void SendLeaveTheServer()
         {
             if (connectionState == ConnectionState.CONNECTED)
@@ -270,6 +282,8 @@ namespace voicemod_test
             }
         }
 
+        // Shutdown the server
+        // Server should send a broadcast message about the shutdown, client disconnects after that
         public void SendServerShutdown()
         {
             if (connectionState == ConnectionState.CONNECTED)
@@ -277,6 +291,8 @@ namespace voicemod_test
                 communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kShutDownServerCMD, ""));
             }
         }
+
+        // Perform a connection with time out 2 secs
         public bool Connect(string displayName, string port)
         {
             CloseAllConnections();
