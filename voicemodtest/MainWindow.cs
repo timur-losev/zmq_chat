@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Threading;
-
 namespace voicemod_test
 {
     public partial class MainWindow : Form
@@ -85,33 +84,42 @@ namespace voicemod_test
             if (nameTextBox.Text != YOUR_NAME && nameTextBox.Text.Length <= 20 && nameTextBox.Text.Length > 0)
             {
                 chatBox.Text = "";
-                if (chatClient.Connect(nameTextBox.Text, portTextBox.Text))
-                {
-                    connectedView();
+                joinServer.Visible = false;
+                connectingLabel.Visible = true;
+                // Initiate the connection in the background thread
+                Task.Factory.StartNew(() => {
+                    chatClient.Connect(nameTextBox.Text, portTextBox.Text, success => {
+                        // Redirect to the main thread
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            if (success)
+                            {
+                                connectedView();
 
-                    // Set the capture to user's name
-                    this.Text = nameTextBox.Text;
-                }
-                else
-                {
-                    var res = MessageBox.Show(String.Format("No server at port: {0} \nWould you like to start it?", portTextBox.Text), "Sorry", MessageBoxButtons.YesNo);
-                    
-                    if (res == DialogResult.Yes)
-                    {
-                        // Establish a new server instance
-                        string path = System.IO.Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath);
-#if DEBUG
-                        System.Diagnostics.Process.Start(path + "/../../../../server/bin/Debug/net5.0/server.exe", "-" + portTextBox.Text);
-#else
-                        System.Diagnostics.Process.Start(path + "/server.exe", "-" + portTextBox.Text);
-#endif
-                        Thread.Sleep(500);
+                                // Set the capture to user's name
+                                this.Text = nameTextBox.Text;
+                            }
+                            else
+                            {
+                                var res = MessageBox.Show(String.Format("No server at port: {0} \nWould you like to start it?", portTextBox.Text), "Sorry", MessageBoxButtons.YesNo);
 
-                        // Try connecting again
-                        joinServer_Click(sender, e);
-                    }
-                }
+                                if (res == DialogResult.Yes)
+                                {
+                                    // Establish a new server instance
+                                    common.Common.StartServer(portTextBox.Text, System.IO.Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath));
+                                    Thread.Sleep(500);
 
+                                    // Try connecting again
+                                    joinServer_Click(sender, e);
+                                }
+                                else
+                                {
+                                    disconnectedView();
+                                }
+                            }
+                        });
+                    });
+                });
             }
             else
             {
@@ -141,6 +149,8 @@ namespace voicemod_test
         {
             connectionPanel.Visible = true;
             sendPanel.Visible = false;
+            joinServer.Visible = true;
+            connectingLabel.Visible = false;
         }
 
         private void connectedView()
@@ -175,4 +185,17 @@ namespace voicemod_test
             disconnectedView();
         }
     }
+    
+    public class TheTest
+    {
+        public static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            var form = new MainWindow();
+            Application.Run(form);
+        }
+    }
 }
+
+

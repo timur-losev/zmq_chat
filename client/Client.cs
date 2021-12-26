@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Forms;
 using NetMQ;
 using NetMQ.Sockets;
 using System.Threading;
@@ -10,22 +9,10 @@ using System.Text.Json;
 using common;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Net.Sockets;
 
 namespace voicemod_test
 {
-    class TheTest
-    {
-        public static void Main()
-        {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            var form = new MainWindow();
-            Application.Run(form);
-        }
-    }
-
-    class ClientEventArgs : EventArgs
+    public class ClientEventArgs : EventArgs
     {
         public string MessageText;
 
@@ -42,7 +29,7 @@ namespace voicemod_test
         NOTCONNECTED
     }
 
-    class Client
+    public class Client
     {
         private string messagePort = "";
         private string displayName = "";
@@ -52,12 +39,11 @@ namespace voicemod_test
 
         private RequestSocket requester = null;
         private SubscriberSocket chatRoomSocket = null;
-        private bool bStopReqRepSignal = false;
 
         private string reqRepEndPoint = "";
         private string messagePipeEndpoint = "";
 
-        private ConnectionState connectionState = ConnectionState.CONNECTING;
+        private ConnectionState connectionState = ConnectionState.CONNECTED;
 
         public EventHandler<ClientEventArgs> OnNewMessage;
         public EventHandler<ClientEventArgs> OnServerDisconnected;
@@ -68,8 +54,6 @@ namespace voicemod_test
         // Uber close all
         private void CloseAllConnections()
         {
-            bStopReqRepSignal = true;
-
             if (ctsmessagepipe != null)
                 ctsmessagepipe.Cancel();
 
@@ -91,20 +75,40 @@ namespace voicemod_test
             }
 
             communicationQueue.Clear();
+        }
 
-            bStopReqRepSignal = false;
+        private bool TryReqRep(string cmd, string payload)
+        {
+            var timeout = TimeSpan.FromSeconds(2.5);
+
+            if (requester.TrySendFrame(timeout, cmd, true))
+            {
+                if (requester.TrySendFrame(timeout, payload, false))
+                {
+                    var responseCmd = "";
+                    var more = false;
+                    if (requester.TryReceiveFrameString(timeout, out responseCmd, out more))
+                    {
+                        Debug.Assert(cmd == responseCmd);
+
+                        // No operation, just fulfilling ZMQ state machine
+                        while (more)
+                            requester.ReceiveFrameString(out more);
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         // Process communication between Client and Server
-        private void ProcessReqRepMessages()
+        private bool ProcessReqRepMessages()
         {
-            var payload = "";
-            var cmd = "";
-            var more = false;
-
-            while (!bStopReqRepSignal)
+            KeyValuePair<string, string> command;
+            while (true)
             {
-                KeyValuePair<string, string> command;
                 if (communicationQueue.TryDequeue(out command))
                 {
                     switch (command.Key)
@@ -116,18 +120,12 @@ namespace voicemod_test
                                 {
                                     MessageText = command.Value
                                 };
-                                payload = JsonSerializer.Serialize(sendMessage);
+                                var payload = JsonSerializer.Serialize(sendMessage);
 
-                                requester.SendMoreFrame(NetworkCommands.kSendMessageCMD).SendFrame(payload);
-
-                                more = false;
-                                cmd = requester.ReceiveFrameString(out more);
-
-                                Debug.Assert(cmd == NetworkCommands.kServerGotTheMessage);
-
-                                // No operation, just fulfilling ZMQ state machine
-                                while (more)
-                                    requester.ReceiveFrameString(out more);
+                                if (!TryReqRep(NetworkCommands.kSendMessageCMD, payload))
+                                {
+                                    return false;
+                                }
 
                                 break;
                             }
@@ -138,24 +136,15 @@ namespace voicemod_test
                                 {
                                     UserName = displayName
                                 };
-                                payload = JsonSerializer.Serialize(msg);
+                                var payload = JsonSerializer.Serialize(msg);
 
-                                requester.SendMoreFrame(NetworkCommands.kLeaveTheServerCMD).SendFrame(payload);
+                                TryReqRep(NetworkCommands.kLeaveTheServerCMD, payload);
 
-                                more = false;
-                                cmd = requester.ReceiveFrameString(out more);
-
-                                // Server accepted our leave
-                                Debug.Assert(cmd == NetworkCommands.kLeaveTheServerCMD);
-
-                                // No operation, just fulfilling ZMQ state machine
-                                while (more)
-                                    requester.ReceiveFrameString(out more);
-
+                                // Cancel the Chat Message Pipe
                                 ctsmessagepipe.Cancel();
 
                                 // Return from the worker thread
-                                return;
+                                return true;
                             }
 
                         // Send shut down to the server
@@ -170,6 +159,14 @@ namespace voicemod_test
                     Thread.Sleep(100);
                 }
             }
+        }
+
+        private void OnConnectionLost()
+        {
+            OnNewMessage(null, new ClientEventArgs("SERVER HAS BEEN SHUT DOWN"));
+
+            if (OnServerDisconnected != null)
+                OnServerDisconnected(null, null);
         }
 
         // Initiate a connection between Client and Server
@@ -213,8 +210,14 @@ namespace voicemod_test
 
                 OnNewMessage(null, new ClientEventArgs(connectionResponse.ChatHistory));
 
-                // A running loop from here
-                ProcessReqRepMessages();
+                // A run loop from here
+                var result = ProcessReqRepMessages();
+
+                // Unexpected exit
+                if (!result)
+                {
+                    OnConnectionLost();
+                }
             }
 
             connectionState = ConnectionState.NOTCONNECTED;
@@ -249,15 +252,13 @@ namespace voicemod_test
                         }
                     case NetworkCommands.kShutDownServerCMD:
                         {
-                            OnNewMessage(null, new ClientEventArgs("SERVER HAS BEEN SHUT DOWN"));
-
-                            if (OnServerDisconnected != null)
-                                OnServerDisconnected(null, null);
-
+                            OnConnectionLost();
+                            // Return from the message pipe thread
                             return;
                         }
                 }
 
+                // Save CPU
                 Thread.Sleep(500);
             }
         }
@@ -293,7 +294,7 @@ namespace voicemod_test
         }
 
         // Perform a connection with time out 2 secs
-        public bool Connect(string displayName, string port)
+        public void Connect(string displayName, string port, System.Action<bool> onConnect)
         {
             CloseAllConnections();
 
@@ -326,16 +327,16 @@ namespace voicemod_test
                     }
                 }));
 
-                return true;
+                onConnect(true);
             }
             else
             {
                 // Connection time out
                 // Break the connection task
                 CloseAllConnections();
-            }
 
-            return false;
+                onConnect(false);
+            }
         }
     }
 }

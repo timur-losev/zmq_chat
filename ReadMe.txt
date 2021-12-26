@@ -1,5 +1,3 @@
-# zmq_chat
-
 
 Brief explanation of the architecture.
 
@@ -13,3 +11,5 @@ Each SUB client (with the sender) receves new chat message.
 Client uses Lazy Pirate strategy to perform client side reliablity. So that when the Server crashes, Client will safelly exit on the next communication attempt.
 
 Client and Server are single-class projects and only represent the simplest asyncronious state machine
+
+

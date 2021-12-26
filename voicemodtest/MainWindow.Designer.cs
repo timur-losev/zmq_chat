@@ -39,6 +39,7 @@ namespace voicemod_test
             this.leaveBtn = new System.Windows.Forms.Button();
             this.sendBtn = new System.Windows.Forms.Button();
             this.sendTextBox = new System.Windows.Forms.TextBox();
+            this.connectingLabel = new System.Windows.Forms.Label();
             this.connectionPanel.SuspendLayout();
             this.sendPanel.SuspendLayout();
             this.SuspendLayout();
@@ -56,9 +57,10 @@ namespace voicemod_test
             // connectionPanel
             // 
             this.connectionPanel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(128)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
+            this.connectionPanel.Controls.Add(this.connectingLabel);
             this.connectionPanel.Controls.Add(this.portTextBox);
-            this.connectionPanel.Controls.Add(this.nameTextBox);
             this.connectionPanel.Controls.Add(this.joinServer);
+            this.connectionPanel.Controls.Add(this.nameTextBox);
             this.connectionPanel.Location = new System.Drawing.Point(238, 175);
             this.connectionPanel.Name = "connectionPanel";
             this.connectionPanel.Size = new System.Drawing.Size(317, 83);
@@ -89,7 +91,7 @@ namespace voicemod_test
             // 
             this.joinServer.Font = new System.Drawing.Font("Segoe UI", 13F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point);
             this.joinServer.ForeColor = System.Drawing.Color.Blue;
-            this.joinServer.Location = new System.Drawing.Point(210, 12);
+            this.joinServer.Location = new System.Drawing.Point(207, 12);
             this.joinServer.Name = "joinServer";
             this.joinServer.Size = new System.Drawing.Size(93, 61);
             this.joinServer.TabIndex = 0;
@@ -147,6 +149,17 @@ namespace voicemod_test
             this.sendTextBox.TabIndex = 0;
             this.sendTextBox.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.sendTextBox_KeyPress);
             // 
+            // connectingLabel
+            // 
+            this.connectingLabel.AutoSize = true;
+            this.connectingLabel.Font = new System.Drawing.Font("Segoe UI", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.connectingLabel.ForeColor = System.Drawing.Color.DarkRed;
+            this.connectingLabel.Location = new System.Drawing.Point(201, 34);
+            this.connectingLabel.Name = "connectingLabel";
+            this.connectingLabel.Size = new System.Drawing.Size(110, 20);
+            this.connectingLabel.TabIndex = 3;
+            this.connectingLabel.Text = "CONNECTING...";
+            // 
             // MainWindow
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -157,6 +170,7 @@ namespace voicemod_test
             this.Controls.Add(this.chatBox);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.Name = "MainWindow";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Form1";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Shown += new System.EventHandler(this.Form1_Shown);
@@ -180,6 +194,7 @@ namespace voicemod_test
         private System.Windows.Forms.TextBox sendTextBox;
         private System.Windows.Forms.Button shutDownServer;
         private System.Windows.Forms.Button leaveBtn;
+        private System.Windows.Forms.Label connectingLabel;
     }
 }
 

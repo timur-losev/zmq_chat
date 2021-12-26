@@ -5,3 +5,9 @@ common/bin/
 common/obj/
 server/bin/
 server/obj/
+OUT/
+server_tests/bin/Debug/
+server_tests/bin/Release/
+server_tests/obj/
+voicemodtest/bin/
+voicemodtest/obj/

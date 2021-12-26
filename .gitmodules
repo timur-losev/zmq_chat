@@ -1,0 +1,3 @@
+[submodule "netmq"]
+	path = netmq
+	url = https://github.com/timur-losev/netmq

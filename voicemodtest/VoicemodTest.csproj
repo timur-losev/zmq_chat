@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net5.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>J:\Work\voicelab\OUT\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\client\client.csproj" />
+    <ProjectReference Include="..\common\common.csproj" />
+    <ProjectReference Include="..\netmq\src\NetMQ\NetMQ.csproj" />
+    <ProjectReference Include="..\server\server.csproj" />
+  </ItemGroup>
+
+</Project>

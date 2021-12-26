@@ -19,7 +19,7 @@ namespace server
         static Queue<KeyValuePair<string, string>> communicationQueue = new Queue<KeyValuePair<string, string>>();
         static string broadcastBuffer = "";
 
-        // A communication pipe between Server and Client
+        // Receive commands from the Client
         static void repSocket_ReceiveReady(object sender, NetMQSocketEventArgs e)
         {
             var more = false;
@@ -69,7 +69,7 @@ namespace server
                         broadcastBuffer = newMessage.MessageText;
                         history += newMessage.MessageText;
 
-                        communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kServerGotTheMessage, ""));
+                        communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kSendMessageCMD, ""));
 
                         break;
                     }
@@ -100,8 +100,10 @@ namespace server
             }
         }
 
+        // Ready to send response
         static void repSocket_SendReady(object sender, NetMQSocketEventArgs e)
         {
+            // Sending back commands to the Client
             while (communicationQueue.Count > 0)
             {
                 var cmd = communicationQueue.Dequeue();
@@ -109,6 +111,7 @@ namespace server
             }
         }
 
+        // Ready to broadcast
         static void pubSocket_SendReady(object sender, NetMQSocketEventArgs e)
         {
             if (broadcastBuffer.Length > 0)
@@ -124,6 +127,7 @@ namespace server
                 e.Socket.SendMoreFrame(NetworkCommands.kNewMessageCMD).SendFrame(JsonSerializer.Serialize(messagePacket));
             }
 
+            // Broadcast shutdown event to subs and exit
             if (notifyShutdown)
             {
                 notifyShutdown = false;
@@ -140,7 +144,7 @@ namespace server
             using (var handShakeSocket = new ResponseSocket())
             {
                 // Read command line args to determine the port number
-                var handShakePort = "3366";
+                var handShakePort = "0";
                 if (args.Length == 1)
                 {
                     handShakePort = args[0].Substring(1);
