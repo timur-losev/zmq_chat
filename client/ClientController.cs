@@ -1,36 +1,26 @@
 using System;
 using System.Threading.Tasks;
-using NetMQ;
-using NetMQ.Sockets;
 using System.Threading;
 using System.Text.Json;
+using System.Diagnostics;
 using common;
 
 namespace client
 {
     public class ClientController
     {
-        public static double kServerCommunicationTimeout = 2.0; //Connection timeout in seconds
-
         private string m_userName = "";
 
         private CancellationTokenSource m_ctsRequestResponsePipe = null;
         private CancellationTokenSource m_ctsChatRoom = null;
 
-        private RequestResponseProcessor m_requestResponseProcessor = new RequestResponseProcessor(kServerCommunicationTimeout);
-        private ChatRoom m_chatRoom = new ChatRoom();
+        private IRequestResponseProcessor m_requestResponseProcessor = null;
+        private IBroadcastMessageListener m_chatRoom = null;
 
-        /// <summary>
-        /// Uber close all
-        /// </summary>
-        private void CloseAllConnections()
+        public ClientController(IBroadcastMessageListener broadcastMessageListener, IRequestResponseProcessor reqRepProc)
         {
-            m_ctsChatRoom?.Cancel();
-            m_ctsRequestResponsePipe?.Cancel();
-
-            Thread.Sleep(500);
-            m_requestResponseProcessor.CloseConnection();
-            m_chatRoom.CloseConnection();
+            m_chatRoom = broadcastMessageListener;
+            m_requestResponseProcessor = reqRepProc;
         }
 
         /// <summary>
@@ -48,8 +38,10 @@ namespace client
             m_requestResponseProcessor.SendData(new common.CommandAndPayload(NetworkCommands.kSendMessageCMD, payload));
         }
 
-        // Send leave the server command
-        // Client will disconnect automatically
+        /// <summary>
+        /// Send leave the server command
+        /// Client will disconnect automatically
+        /// </summary>
         public void SendLeaveTheServer()
         {
             var payload = JsonSerializer.Serialize(new LeaveRequest
@@ -57,10 +49,10 @@ namespace client
                 UserName = m_userName
             });
 
-            // Send leave the server, communication will be interrupted on response
+            // Send leave from the server, communication will be interrupted on response
             m_requestResponseProcessor.SendData(new common.CommandAndPayload(NetworkCommands.kLeaveTheServerCMD, payload));
 
-            // Close the Chat Message Pipe because communication is going to interrupt
+            // Close the chat room because communication is going to interrupt
             m_ctsChatRoom?.Cancel();
         }
 
@@ -101,17 +93,39 @@ namespace client
                         UserName = displayName
                     }),
                     // onSuccess
-                    (string chatHistory, string chatRoomPort) =>
+                    (CommandAndPayload response) =>
                     {
+                        Debug.Assert(response.Command == NetworkCommands.kAcceptedClientCMD);
+                        var connectionResponse = JsonSerializer.Deserialize<AcceptedClient>(response.Payload);
+
                         // Enter the given chat room
                         m_ctsChatRoom = new CancellationTokenSource();
                         Task.Run(() =>
                         {
-                            m_chatRoom.RunMessageListener(m_ctsChatRoom.Token, chatRoomPort, onNewChatMessage, onServerShutDown);
+                            m_chatRoom.RunServerListener(m_ctsChatRoom.Token, connectionResponse.ChatRoomPort, 
+                                // onNewMessage
+                                (CommandAndPayload data) => {
+                                    switch (data.Command)
+                                    {
+                                        case NetworkCommands.kNewMessageCMD:
+                                            {
+                                                var newMessage = JsonSerializer.Deserialize<MessagePacket>(data.Payload);
+
+                                                onNewChatMessage?.Invoke(newMessage.MessageText);
+                                                break;
+                                            }
+                                        case NetworkCommands.kShutDownServerCMD:
+                                            {
+                                                onServerShutDown?.Invoke();
+                                                // Close chat room
+                                                return;
+                                            }
+                                    }
+                                });
                         });
 
                         // Provide chat history to the caller
-                        onConnected(chatHistory);
+                        onConnected(connectionResponse.ChatHistory);
 
                         // Run a communication channel between client and server
                         m_requestResponseProcessor.Run(m_ctsRequestResponsePipe.Token,
@@ -138,6 +152,20 @@ namespace client
                         onConnectionFailed();
                     });
             }, m_ctsRequestResponsePipe.Token);
+        }
+
+
+        /// <summary>
+        /// Uber close all
+        /// </summary>
+        private void CloseAllConnections()
+        {
+            m_ctsChatRoom?.Cancel();
+            m_ctsRequestResponsePipe?.Cancel();
+
+            Thread.Sleep(100);
+            m_requestResponseProcessor.CloseConnection();
+            m_chatRoom.CloseConnection();
         }
     }
 }

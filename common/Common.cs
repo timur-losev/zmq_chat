@@ -8,11 +8,15 @@ namespace common
         public string Command;
         public string Payload;
 
-        public CommandAndPayload(string inCommand, string inPaylod)
+        public CommandAndPayload(string inCommand, string inPayload)
         {
             Command = inCommand;
-            Payload = inPaylod;
+            Payload = inPayload;
         }
+    }
+    public class Config
+    {
+        public static double kServerCommunicationTimeout = 2.0; //Connection timeout in seconds
     }
 
     public class Common
@@ -47,7 +51,7 @@ namespace common
 
     public class AcceptedClient
     {
-        public string MessagingPort { get; set; }
+        public string ChatRoomPort { get; set; }
         public string ChatHistory { get; set; }
     }
 

@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Threading;
+
 namespace voicemod_test
 {
     public partial class MainWindow : Form
@@ -95,7 +96,7 @@ namespace voicemod_test
                 joinServer.Visible = false;
                 connectingLabel.Visible = true;
                 // Initiate the connection in the background thread
-               Task.Run(() => {
+                Task.Run(() => {
                     m_chatClient.Connect(nameTextBox.Text, portTextBox.Text,
                         // onConnected callback
                         chatHistory =>
@@ -200,7 +201,7 @@ namespace voicemod_test
         private void Form1_Shown(object sender, EventArgs e)
         {
             disconnectedView();
-            m_chatClient = new client.ClientController();
+            m_chatClient = new client.ClientController(new client.impl.ZMQChatRoomMessageListener(), new client.impl.ZMQRequestResponseProcessor(common.Config.kServerCommunicationTimeout));
         }
 
         private void shutDownServer_Click(object sender, EventArgs e)

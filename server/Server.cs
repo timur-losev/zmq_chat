@@ -10,8 +10,6 @@ namespace server
 { 
     class Server
     {
-
-
         static string messagePort = "0";
         static string history = "";
         static bool notifyShutdown = false;
@@ -51,7 +49,7 @@ namespace server
 
                         var acceptedClient = new AcceptedClient
                         {
-                            MessagingPort = messagePort,
+                            ChatRoomPort = messagePort,
                             ChatHistory = history
                         };
 
