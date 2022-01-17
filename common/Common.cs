@@ -1,7 +1,20 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace common
 {
+    public class CommandAndPayload
+    {
+        public string Command;
+        public string Payload;
+
+        public CommandAndPayload(string inCommand, string inPaylod)
+        {
+            Command = inCommand;
+            Payload = inPaylod;
+        }
+    }
+
     public class Common
     {
         public static void StartServer(string port, string path, bool unitTestEnv = false)

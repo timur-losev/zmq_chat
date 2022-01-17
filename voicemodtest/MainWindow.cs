@@ -15,7 +15,7 @@ namespace voicemod_test
         const string YOUR_NAME = "YOUR_NAME";
         const string PORT = "PORT";
 
-        Client chatClient = null;
+        client.ClientController m_chatClient = null;
 
         public MainWindow()
         {
@@ -54,15 +54,23 @@ namespace voicemod_test
             }
         }
 
-        private void OnNewMessage(object o, ClientEventArgs args)
+        private void OnNewChatMessage(string message)
         {
             // Pass message through the main thread
-            this.Invoke((MethodInvoker)delegate {
-                this.chatBox.Text += args.MessageText;
-            });
+            if (InvokeRequired)
+            {
+                this.Invoke((MethodInvoker)delegate
+                {
+                    this.chatBox.Text += message;
+                });
+            }
+            else
+            {
+                this.chatBox.Text += message;
+            }
         }
 
-        private void OnServerDisconnected(object o, ClientEventArgs args)
+        private void OnServerDisconnected()
         {
             this.Invoke((MethodInvoker)delegate
             {
@@ -87,38 +95,57 @@ namespace voicemod_test
                 joinServer.Visible = false;
                 connectingLabel.Visible = true;
                 // Initiate the connection in the background thread
-                Task.Factory.StartNew(() => {
-                    chatClient.Connect(nameTextBox.Text, portTextBox.Text, success => {
-                        // Redirect to the main thread
-                        this.Invoke((MethodInvoker)delegate
+               Task.Run(() => {
+                    m_chatClient.Connect(nameTextBox.Text, portTextBox.Text,
+                        // onConnected callback
+                        chatHistory =>
                         {
-                            if (success)
+                            // Redirect to the main thread
+                            if (this.InvokeRequired)
                             {
-                                connectedView();
+                                this.Invoke((MethodInvoker)delegate
+                                {
+                                    connectedView();
 
-                                // Set the capture to user's name
-                                this.Text = nameTextBox.Text;
+                                    this.Text = nameTextBox.Text;
+                                    this.chatBox.Text = chatHistory;
+                                });
                             }
-                            else
+                        },
+                        // onConnectionFailed callback
+                        () =>
+                        {
+                            // Redirect to the main thread
+                            if (this.InvokeRequired)
                             {
-                                var res = MessageBox.Show(String.Format("No server at port: {0} \nWould you like to start it?", portTextBox.Text), "Sorry", MessageBoxButtons.YesNo);
-
-                                if (res == DialogResult.Yes)
+                                this.Invoke((MethodInvoker)delegate
                                 {
-                                    // Establish a new server instance
-                                    common.Common.StartServer(portTextBox.Text, System.IO.Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath));
-                                    Thread.Sleep(500);
+                                    var res = MessageBox.Show(String.Format("No server at port: {0} \nWould you like to start it?", portTextBox.Text), "Sorry", MessageBoxButtons.YesNo);
 
-                                    // Try connecting again
-                                    joinServer_Click(sender, e);
-                                }
-                                else
-                                {
-                                    disconnectedView();
-                                }
+                                    if (res == DialogResult.Yes)
+                                    {
+                                        // Launch a new server instance
+                                        common.Common.StartServer(portTextBox.Text, System.IO.Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath));
+                                        Thread.Sleep(500);
+
+                                        // Try connecting again
+                                        joinServer_Click(sender, e);
+                                    }
+                                    else
+                                    {
+                                        disconnectedView();
+                                    }
+                                });
                             }
+                        },
+                        // onNewChatMessage callback
+                        OnNewChatMessage,
+                        //onServerShutDown callback
+                        () =>
+                        {
+                            OnNewChatMessage("SERVER HAS BEEN SHUT DOWN");
+                            OnServerDisconnected();
                         });
-                    });
                 });
             }
             else
@@ -131,7 +158,7 @@ namespace voicemod_test
         {
             if (sendTextBox.Text.Length > 0)
             {
-                chatClient.SendChatMessage(sendTextBox.Text);
+                m_chatClient.SendChatMessage(sendTextBox.Text);
                 sendTextBox.Text = "";
             }
         }
@@ -140,7 +167,7 @@ namespace voicemod_test
         {
             if (e.KeyChar == '\r' && sendTextBox.Text.Length > 0)
             {
-                chatClient.SendChatMessage(sendTextBox.Text);
+                m_chatClient.SendChatMessage(sendTextBox.Text);
                 sendTextBox.Text = "";
             }
         }
@@ -161,26 +188,24 @@ namespace voicemod_test
 
         private void leaveBtn_Click(object sender, EventArgs e)
         {
-            chatClient.SendLeaveTheServer();
+            m_chatClient.SendLeaveTheServer();
             disconnectedView();
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            chatClient.SendLeaveTheServer();
+            m_chatClient.SendLeaveTheServer();
         }
 
         private void Form1_Shown(object sender, EventArgs e)
         {
             disconnectedView();
-            chatClient = new Client();
-            chatClient.OnNewMessage += new EventHandler<ClientEventArgs>(OnNewMessage);
-            chatClient.OnServerDisconnected += new EventHandler<ClientEventArgs>(OnServerDisconnected);
+            m_chatClient = new client.ClientController();
         }
 
         private void shutDownServer_Click(object sender, EventArgs e)
         {
-            chatClient.SendServerShutdown();
+            m_chatClient.SendServerShutdown();
 
             disconnectedView();
         }

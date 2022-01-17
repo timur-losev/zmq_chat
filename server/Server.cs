@@ -7,16 +7,18 @@ using common;
 using System.Collections.Generic;
 
 namespace server
-{
+{ 
     class Server
     {
+
+
         static string messagePort = "0";
         static string history = "";
         static bool notifyShutdown = false;
 
         static NetMQPoller poller = null;
 
-        static Queue<KeyValuePair<string, string>> communicationQueue = new Queue<KeyValuePair<string, string>>();
+        static Queue<CommandAndPayload> communicationQueue = new Queue<CommandAndPayload>();
         static string broadcastBuffer = "";
 
         // Receive commands from the Client
@@ -39,6 +41,8 @@ namespace server
                         var newClient = JsonSerializer.Deserialize<ConnectionRequest>(payload);
 
                         // Format "joined" message
+
+                        // ApplyMessage
                         var newLine = "[" + DateTime.Now.ToShortTimeString() + "] " + newClient.UserName + " joined.\n";
                         history += newLine;
                         broadcastBuffer = newLine;
@@ -52,7 +56,7 @@ namespace server
                         };
 
                         // Accept the client and send back the chat history
-                        communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kAcceptedClientCMD, JsonSerializer.Serialize(acceptedClient)));
+                        communicationQueue.Enqueue(new CommandAndPayload(NetworkCommands.kAcceptedClientCMD, JsonSerializer.Serialize(acceptedClient)));
 
                         break;
                     }
@@ -69,7 +73,7 @@ namespace server
                         broadcastBuffer = newMessage.MessageText;
                         history += newMessage.MessageText;
 
-                        communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kSendMessageCMD, ""));
+                        communicationQueue.Enqueue(new CommandAndPayload(NetworkCommands.kSendMessageCMD, ""));
 
                         break;
                     }
@@ -86,15 +90,14 @@ namespace server
 
                         Console.WriteLine(line);
 
-                        communicationQueue.Enqueue(new KeyValuePair<string, string>(NetworkCommands.kLeaveTheServerCMD, ""));
+                        communicationQueue.Enqueue(new CommandAndPayload(NetworkCommands.kLeaveTheServerCMD, ""));
 
                         break;
                     }
 
                 case NetworkCommands.kShutDownServerCMD:
                     {
-                        // Server is broadcasting "shutdown" signal through the message pipe
-                        notifyShutdown = true;
+                        communicationQueue.Enqueue(new CommandAndPayload(NetworkCommands.kShutDownServerCMD, ""));
                         break;
                     }
             }
@@ -107,7 +110,13 @@ namespace server
             while (communicationQueue.Count > 0)
             {
                 var cmd = communicationQueue.Dequeue();
-                e.Socket.SendMoreFrame(cmd.Key).SendFrame(cmd.Value);
+                e.Socket.SendMoreFrame(cmd.Command).SendFrame(cmd.Payload);
+
+                if (cmd.Command == NetworkCommands.kShutDownServerCMD)
+                {
+                    // Server broadcasts "shutdown" signal through the message pipe
+                    notifyShutdown = true;
+                }
             }
         }
 
@@ -153,7 +162,6 @@ namespace server
                 handShakeSocket.Bind("tcp://*:" + handShakePort);
 
                 Console.WriteLine("Starting at port " + handShakePort);
-
 
                 using (var chatRoomSocket = new PublisherSocket())
                 {
