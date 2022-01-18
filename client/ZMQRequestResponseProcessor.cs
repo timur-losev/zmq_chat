@@ -15,7 +15,7 @@ namespace client.impl
     {
         private string kEndpoint = "tcp://localhost:{0}";
         private RequestSocket m_requestResponseSocket = null;
-        private double m_serverCommunicationTimeout = 2;
+        private double m_serverCommunicationTimeout = 2; // 2 seconds by default
         private ConcurrentQueue<common.CommandAndPayload> m_commandQueue = new ConcurrentQueue<common.CommandAndPayload>();
 
         public ZMQRequestResponseProcessor(double serverCommunicationTimeout)

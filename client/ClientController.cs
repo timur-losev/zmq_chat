@@ -98,8 +98,9 @@ namespace client
                         Debug.Assert(response.Command == NetworkCommands.kAcceptedClientCMD);
                         var connectionResponse = JsonSerializer.Deserialize<AcceptedClient>(response.Payload);
 
-                        // Enter the given chat room
+                        // Prepare a -cancellation token
                         m_ctsChatRoom = new CancellationTokenSource();
+                        // Enter the given chat room
                         Task.Run(() =>
                         {
                             m_chatRoom.RunServerListener(m_ctsChatRoom.Token, connectionResponse.ChatRoomPort, 
