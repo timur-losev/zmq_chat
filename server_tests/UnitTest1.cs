@@ -12,9 +12,9 @@ namespace server_tests
 {
     class MockRequestResponse : IRequestResponseProcessor
     {
-        public void Run(CancellationToken cancellationToken, System.Action<CommandAndPayload> onResponse, System.Action onConnectionLost)
+        public Task RunAsync(CancellationToken cancellationToken, System.Action<CommandAndPayload> onResponse, System.Action onConnectionLost)
         {
-
+            return null;
         }
         public void SendData(common.CommandAndPayload data)
         {

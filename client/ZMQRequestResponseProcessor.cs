@@ -37,9 +37,9 @@ namespace client.impl
         /// <param name="cancellationToken"></param>
         /// <param name="onResponse"></param>
         /// <param name="onConnectionLost"></param>
-        public void Run(CancellationToken cancellationToken, System.Action<CommandAndPayload> onResponse, System.Action onConnectionLost)
+        public Task RunAsync(CancellationToken cancellationToken, System.Action<CommandAndPayload> onResponse, System.Action onConnectionLost)
         {
-            Task.Run(() =>
+            return Task.Run(() =>
             {
                 CommandAndPayload data;
                 while (!cancellationToken.IsCancellationRequested)
@@ -74,7 +74,7 @@ namespace client.impl
         /// Initiate a connection between Client and Server
         /// </summary>
         /// <param name="inPort"></param>
-        /// <param name="inConnectionRequestPayload"></param>
+        /// <param name="connectionRequestPayload"></param>
         /// <param name="onSuccess"></param>
         /// <param name="onConnectionFailed"></param>
         public void InitiateConnection(

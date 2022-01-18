@@ -27,12 +27,12 @@ namespace client
         /// Sending a chat message
         /// User's display name is backed into the message
         /// </summary>
-        /// <param name="inMessageText"></param>
-        public void SendChatMessage(string inMessageText)
+        /// <param name="messageText"></param>
+        public void SendChatMessage(string messageText)
         {
             var payload = JsonSerializer.Serialize(new MessagePacket
             {
-                MessageText = String.Format("{0}:{1}", m_userName, inMessageText)
+                MessageText = String.Format("{0}:{1}", m_userName, messageText)
             });
 
             m_requestResponseProcessor.SendData(new common.CommandAndPayload(NetworkCommands.kSendMessageCMD, payload));
@@ -98,7 +98,7 @@ namespace client
                         Debug.Assert(response.Command == NetworkCommands.kAcceptedClientCMD);
                         var connectionResponse = JsonSerializer.Deserialize<AcceptedClient>(response.Payload);
 
-                        // Prepare a -cancellation token
+                        // Prepare a cancellation token
                         m_ctsChatRoom = new CancellationTokenSource();
                         // Enter the given chat room
                         Task.Run(() =>
@@ -131,11 +131,11 @@ namespace client
                         onConnected(connectionResponse.ChatHistory);
 
                         // Run a communication channel between client and server
-                        m_requestResponseProcessor.Run(m_ctsRequestResponsePipe.Token,
+                        m_requestResponseProcessor.RunAsync(m_ctsRequestResponsePipe.Token,
                             // onResponse
                             (CommandAndPayload data) =>
                             {
-                                // Server accepter our leave
+                                // Server accepted our leave
                                 if (data.Command == NetworkCommands.kLeaveTheServerCMD)
                                 {
                                     // Cancel all operations

@@ -17,6 +17,10 @@ namespace server
         NetMQPoller m_poller = null;
         IChatRoom m_chatRoom = null;
 
+        /// <summary>
+        /// Accumulate history and redirect message to the chat room
+        /// </summary>
+        /// <param name="newLine"></param>
         void ApplyChatMessage(string newLine)
         {
             m_accumulatedChatHistory += newLine;
@@ -31,6 +35,10 @@ namespace server
             Console.WriteLine(newLine);
         }
 
+        /// <summary>
+        /// Register protocol command handlers
+        /// </summary>
+        /// <param name="handler"></param>
         void RegisterCommandHandlers(ICommandHandler handler)
         {
             // New Client received 
@@ -93,10 +101,12 @@ namespace server
         /// <returns></returns>
         void SetupRequestResponseChannel(string inPort, ICommandHandler requestResponseHandler)
         {
-            // On server respond to the client
+            requestResponseHandler.Bind(String.Format("tcp://*:{0}", inPort));
+
+            // On server sent command to the client
             requestResponseHandler.OnCommandSent += commandAndPayload =>
             {
-                // We need to check if "shut down" command was handled and then server will send "shut down" to all the clients and stop
+                // We need to check if our "shut down" command was handled and then server will forward "shut down" to all the clients and stop
                 if (commandAndPayload.Command == NetworkCommands.kShutDownServerCMD)
                 {
                     // Server broadcasts "shutdown" signal through the PUB-SUB communication channel
@@ -106,28 +116,31 @@ namespace server
 
             RegisterCommandHandlers(requestResponseHandler);
 
-            requestResponseHandler.BindToPort(inPort);
         }
 
         /// <summary>
-        /// SetupChatRoom
+        /// Setup chat room
         /// </summary>
         /// <param name="inPort"></param>
         /// <param name="chatRoom"></param>
         void SetupChatRoom(string inPort, IChatRoom chatRoom)
         {
-            chatRoom.BindToPort(inPort);
+            chatRoom.Bind(String.Format("tcp://*:{0}", inPort));
 
             // After we notified all clients about the shut down, the server will stop
             chatRoom.OnMessageSent += commandAndPayload => {
                 if (commandAndPayload.Command == NetworkCommands.kShutDownServerCMD)
                 {
-                    Thread.Sleep(500);
                     m_poller.Stop();
                 }
             };
         }
-
+        /// <summary>
+        /// Run the server
+        /// </summary>
+        /// <param name="args"></param>
+        /// <param name="requestResponseHandler"></param>
+        /// <param name="chatRoom"></param>
         public void Run(string[] args, ICommandHandler requestResponseHandler, IChatRoom chatRoom)
         {
             // Read command line args to determine the port number

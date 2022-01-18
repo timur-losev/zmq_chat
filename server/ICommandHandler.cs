@@ -18,6 +18,6 @@ namespace server
         public ISocketPollable GetPollableHandle();
         public void RegisterCommandHandler(string cmd, CommandHandlerSignature onNewCommand);
         public void UnRegisterCommandHandler(string cmd);
-        public void BindToPort(string portString);
+        public void Bind(string endpoint);
     }
 }

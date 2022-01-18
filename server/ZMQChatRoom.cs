@@ -26,9 +26,9 @@ namespace server.impl
             m_broadcastBuffer = data;
         }
 
-        public void BindToPort(string portString)
+        public void Bind(string endpoint)
         {
-            m_chatRoomSocket.Bind(String.Format("tcp://*:{0}", portString));
+            m_chatRoomSocket.Bind(endpoint);
             m_chatRoomSocket.SendReady += new EventHandler<NetMQSocketEventArgs>(pubSocket_SendReady);
         }
 

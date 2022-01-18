@@ -14,7 +14,7 @@ namespace server
         System.Action<CommandAndPayload> OnMessageSent { get; set; }
 
         public void SendAll(CommandAndPayload data);
-        public void BindToPort(string portString);
+        public void Bind(string endpoint);
         public string GetEndpoint();
         public ISocketPollable GetPollableHandle();
     }

@@ -18,9 +18,13 @@ namespace server.impl
         private ResponseSocket m_requestResponseSocket = new ResponseSocket();
         public System.Action<CommandAndPayload> OnCommandSent { get; set; }
 
-        public void BindToPort(string portString)
+        /// <summary>
+        /// Bind the socket
+        /// </summary>
+        /// <param name="endpoint"></param>
+        public void Bind(string endpoint)
         {
-            m_requestResponseSocket.Bind(String.Format("tcp://*:{0}", portString));
+            m_requestResponseSocket.Bind(endpoint);
 
             m_requestResponseSocket.SendReady += new EventHandler<NetMQSocketEventArgs>(repSocket_SendReady);
             m_requestResponseSocket.ReceiveReady += new EventHandler<NetMQSocketEventArgs>(repSocket_ReceiveReady);
