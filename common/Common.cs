@@ -30,11 +30,11 @@ namespace common
 
             if (!isDebug || unitTestEnv)
             {
-                System.Diagnostics.Process.Start(path + "/server.exe", "-" + port);
+                System.Diagnostics.Process.Start(String.Format("{0}/server.exe", path), String.Format("-{0}", port));
             }
             else
             {
-                System.Diagnostics.Process.Start(path + "/../../../../server/bin/Debug/net5.0/server.exe", "-" + port);
+                System.Diagnostics.Process.Start(String.Format("{0}/../../../../server/bin/Debug/net5.0/server.exe", path), String.Format("-{0}", port));
             }
         }
     }
@@ -44,7 +44,7 @@ namespace common
         public const string kHelloKittyCMD = "HelloKitty";
         public const string kAcceptedClientCMD = "Accepted";
         public const string kSendMessageCMD = "SendMessage";
-        public const string kLeaveTheServerCMD = "Leave";
+        public const string kLeaveTheServerCMD = "LeaveTheServer";
         public const string kShutDownServerCMD = "ServerShutDown";
         public const string kNewMessageCMD = "NewMessage";
     }

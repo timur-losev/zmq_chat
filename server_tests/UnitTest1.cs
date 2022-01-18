@@ -1,71 +1,88 @@
-//using System.Diagnostics;
-//using System;
-//using Xunit;
-//using System.Threading;
-//using System.Threading.Tasks;
-//using System.IO;
+using System.Diagnostics;
+using System;
+using Xunit;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Text.Json;
+using System.IO;
+using client;
+using common;
 
-//namespace server_tests
-//{
-//    public class UnitTest1
-//    {
-//        [Fact]
-//        public void ServerInitialTest()
-//        {
-//            bool gotJoined = false;
-//            bool gotText = false;
-//            bool gotDisconnectedText = false;
-//            bool gotDisconnected = false;
+namespace server_tests
+{
+    class MockRequestResponse : IRequestResponseProcessor
+    {
+        public void Run(CancellationToken cancellationToken, System.Action<CommandAndPayload> onResponse, System.Action onConnectionLost)
+        {
 
-//            Task.Factory.StartNew(() =>
-//            {
-//                common.Common.StartServer("51515", Directory.GetCurrentDirectory(), true);
-//                Thread.Sleep(500);
+        }
+        public void SendData(common.CommandAndPayload data)
+        {
 
-//                var client = new voicemod_test.ClientController();
-//                client.OnNewMessage += new EventHandler<voicemod_test.ClientEventArgs>((object o, voicemod_test.ClientEventArgs args) =>
-//                {
-//                    if (!gotJoined)
-//                    {
-//                        gotJoined = args.MessageText.Contains("TEST joined");
-//                    }
+        }
+        public void InitiateConnection(
+            string inPort, // Port where server is running at
+            string connectionRequestPayload, // First data sent to server
+            System.Action<CommandAndPayload> onSuccess, // On success callback
+            System.Action onConnectionFailed) // On fail callback
+        {
+            var acceptedClient = new AcceptedClient
+            {
+                ChatRoomPort = "777",
+                ChatHistory = "TEST HISTORY"
+            };
 
-//                    if (!gotText)
-//                    {
-//                        gotText = args.MessageText.Contains("TEST TEST TEST");
-//                    }
+            onSuccess(new CommandAndPayload(NetworkCommands.kAcceptedClientCMD, JsonSerializer.Serialize(acceptedClient)));
+        }
+        public void CloseConnection()
+        {
 
-//                    if (!gotDisconnectedText)
-//                    {
-//                        gotDisconnectedText = args.MessageText.Contains("SERVER HAS BEEN SHUT DOWN");
-//                    }
-//                });
+        }
+    }
 
-//                client.OnServerDisconnected += new EventHandler<voicemod_test.ClientEventArgs>((object o, voicemod_test.ClientEventArgs args) =>
-//                {
-//                    gotDisconnected = true;
-//                });
+    class MockChatRoom : IBroadcastMessageListener
+    {
+        public void RunServerListener(CancellationToken cancellationToken, string chatRoomPort, System.Action<CommandAndPayload> onNewMessage)
+        {
+            Debug.Assert(chatRoomPort == "777");
 
-//                client.Connect("TEST", "51515", success =>
-//                {
-//                    Debug.Assert(success);
-//                });
+            var messagePacket = new MessagePacket
+            {
+                MessageText = "NEW MESSAGE"
+            };
 
-//                Thread.Sleep(500);
+            onNewMessage?.Invoke(new CommandAndPayload(NetworkCommands.kNewMessageCMD, JsonSerializer.Serialize(messagePacket)));
+        }
+        public void CloseConnection()
+        {
 
-//                client.SendChatMessage("TEST TEST TEST");
+        }
+    }
 
-//                client.SendServerShutdown();
-//            });
+    public class UnitTest1
+    {
+        [Fact]
+        public void CommunicationMockTest()
+        {
+            var reqRepMock = new MockRequestResponse();
+            var chatRoomMock = new MockChatRoom();
 
-//            var totaltime = 0;
-//            while (!gotDisconnected && totaltime < 10000)
-//            {
-//                Thread.Sleep(100);
-//                totaltime += 100;
-//            }
+            var client = new ClientController(chatRoomMock, reqRepMock);
 
-//            Debug.Assert(gotDisconnected && gotJoined && gotText && gotDisconnectedText);
-//        }
-//    }
-//}
+            var t = client.Connect("Timur", "0",
+                chatHistory =>
+                {
+                    Debug.Assert(chatHistory == "TEST HISTORY");
+                },
+                null,
+                newChatMessage =>
+                {
+                    Debug.Assert(newChatMessage == "NEW MESSAGE");
+                },
+                null
+                );
+
+            t.Wait();
+        }
+    }
+}

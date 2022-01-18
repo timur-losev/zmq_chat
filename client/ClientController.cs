@@ -74,7 +74,7 @@ namespace client
         /// <param name="onConnectionFailed"></param>
         /// <param name="onNewChatMessage"></param>
         /// <param name="onServerShutDown"></param>
-        public void Connect(string displayName, string inPort, System.Action<string> onConnected, System.Action onConnectionFailed, System.Action<string> onNewChatMessage, System.Action onServerShutDown)
+        public Task Connect(string displayName, string inPort, System.Action<string> onConnected, System.Action onConnectionFailed, System.Action<string> onNewChatMessage, System.Action onServerShutDown)
         {
             CloseAllConnections();
 
@@ -83,7 +83,7 @@ namespace client
             m_ctsRequestResponsePipe = new CancellationTokenSource();
 
             // Run operation in background
-            Task.Run(() =>
+            return Task.Run(() =>
             {
                 m_requestResponseProcessor.InitiateConnection(
                     inPort,
