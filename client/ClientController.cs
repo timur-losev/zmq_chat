@@ -128,7 +128,7 @@ namespace client
                         });
 
                         // Provide chat history to the caller
-                        onConnected(connectionResponse.ChatHistory);
+                        onConnected?.Invoke(connectionResponse.ChatHistory);
 
                         // Run a communication channel between client and server
                         m_requestResponseProcessor.RunAsync(m_ctsRequestResponsePipe.Token,

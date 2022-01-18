@@ -59,10 +59,10 @@ namespace server_tests
         }
     }
 
-    public class UnitTest1
+    public class UnitTests
     {
         [Fact]
-        public void CommunicationMockTest()
+        public void TestHistory()
         {
             var reqRepMock = new MockRequestResponse();
             var chatRoomMock = new MockChatRoom();
@@ -75,9 +75,26 @@ namespace server_tests
                     Debug.Assert(chatHistory == "TEST HISTORY");
                 },
                 null,
-                newChatMessage =>
-                {
-                    Debug.Assert(newChatMessage == "NEW MESSAGE");
+                null,
+                null
+                );
+
+            t.Wait();
+        }
+
+        [Fact]
+        public void TestNewMessage()
+        {
+            var reqRepMock = new MockRequestResponse();
+            var chatRoomMock = new MockChatRoom();
+
+            var client = new ClientController(chatRoomMock, reqRepMock);
+
+            var t = client.Connect("Timur", "0",
+                null,
+                null,
+                newMessage => {
+                    Debug.Assert(newMessage == "NEW MESSAGE");
                 },
                 null
                 );
