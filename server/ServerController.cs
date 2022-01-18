@@ -9,77 +9,32 @@ using System.Diagnostics;
 
 namespace server
 { 
-    class BroadcastData
-    {
-        public bool NotifyShutdown = false;
-        public string BroadcastBuffer { get; set; }
-
-        public BroadcastData()
-        {
-            this.BroadcastBuffer = "";
-        }
-        public bool IsBroadcastBufferReady()
-        {
-            return BroadcastBuffer.Length > 0;
-        }
-        public string ConsumeBroadcastBuffer()
-        {
-            Debug.Assert(IsBroadcastBufferReady());
-
-            string retval = BroadcastBuffer;
-            BroadcastBuffer = "";
-
-            return retval;
-        }
-    }
     class ServerController
     {
         string m_chatRoomPort = "0";
         string m_accumulatedChatHistory = "";
         
-        NetMQPoller poller = null;
-
-        BroadcastData m_broadcastData = new BroadcastData();
-        impl.ZMQRequestResponseSocketWrapper m_reqRepSocket = new impl.ZMQRequestResponseSocketWrapper();
+        NetMQPoller m_poller = null;
+        IChatRoom m_chatRoom = null;
 
         void ApplyChatMessage(string newLine)
         {
             m_accumulatedChatHistory += newLine;
 
-            m_broadcastData.BroadcastBuffer = newLine;
+            // Send chat message to all clients
+            var messagePacket = new MessagePacket
+            {
+                MessageText = newLine
+            };
+            m_chatRoom.SendAll(new CommandAndPayload(NetworkCommands.kNewMessageCMD, JsonSerializer.Serialize(messagePacket)));
 
             Console.WriteLine(newLine);
         }
 
-        // Ready to broadcast
-        void pubSocket_SendReady(object sender, NetMQSocketEventArgs e)
-        {
-            if (m_broadcastData.IsBroadcastBufferReady())
-            {
-                var messagePacket = new MessagePacket
-                {
-                    MessageText = m_broadcastData.ConsumeBroadcastBuffer()
-                };
-
-                e.Socket.SendMoreFrame(NetworkCommands.kNewMessageCMD).SendFrame(JsonSerializer.Serialize(messagePacket));
-            }
-
-            // Send shutdown event to all subscribers and exit
-            if (m_broadcastData.NotifyShutdown)
-            {
-                m_broadcastData.NotifyShutdown = false;
-
-                e.Socket.SendFrame(NetworkCommands.kShutDownServerCMD);
-
-                Thread.Sleep(500);
-                poller.Stop();
-            }
-        }
-
-        void RegisterCommandHandlers(impl.ZMQRequestResponseSocketWrapper socket)
+        void RegisterCommandHandlers(ICommandHandler handler)
         {
             // New Client received 
-            socket.RegisterCommandHandler(NetworkCommands.kHelloKittyCMD, inPayload =>
+            handler.RegisterCommandHandler(NetworkCommands.kHelloKittyCMD, inPayload =>
             {
                 var newClient = JsonSerializer.Deserialize<ConnectionRequest>(inPayload);
 
@@ -100,7 +55,7 @@ namespace server
             });
 
             // Client sending a message, Server transmits that message to the PUB socket
-            socket.RegisterCommandHandler(NetworkCommands.kSendMessageCMD, inPayload =>
+            handler.RegisterCommandHandler(NetworkCommands.kSendMessageCMD, inPayload =>
             {
                 var newMessage = JsonSerializer.Deserialize<MessagePacket>(inPayload);
 
@@ -113,7 +68,7 @@ namespace server
             });
 
             // Client intentionally disconnected
-            socket.RegisterCommandHandler(NetworkCommands.kLeaveTheServerCMD, inPayload =>
+            handler.RegisterCommandHandler(NetworkCommands.kLeaveTheServerCMD, inPayload =>
             {
                 var leaver = JsonSerializer.Deserialize<LeaveRequest>(inPayload);
 
@@ -125,7 +80,7 @@ namespace server
                 return new CommandAndPayload(NetworkCommands.kLeaveTheServerCMD, "");
             });
 
-            socket.RegisterCommandHandler(NetworkCommands.kShutDownServerCMD, inPayload =>
+            handler.RegisterCommandHandler(NetworkCommands.kShutDownServerCMD, inPayload =>
             {
                 return new CommandAndPayload(NetworkCommands.kShutDownServerCMD, "");
             });
@@ -136,27 +91,44 @@ namespace server
         /// </summary>
         /// <param name="inPort"></param>
         /// <returns></returns>
-        impl.ZMQRequestResponseSocketWrapper CreateRequestResponseChannel(string inPort)
+        void SetupRequestResponseChannel(string inPort, ICommandHandler requestResponseHandler)
         {
-            var requestResponseSocket = new impl.ZMQRequestResponseSocketWrapper(
-            // On command sent to the client
-            commandAndPayload =>
+            // On server respond to the client
+            requestResponseHandler.OnCommandSent += commandAndPayload =>
             {
                 // We need to check if "shut down" command was handled and then server will send "shut down" to all the clients and stop
                 if (commandAndPayload.Command == NetworkCommands.kShutDownServerCMD)
                 {
                     // Server broadcasts "shutdown" signal through the PUB-SUB communication channel
-                    m_broadcastData.NotifyShutdown = true;
+                    m_chatRoom?.SendAll(new CommandAndPayload(NetworkCommands.kShutDownServerCMD, ""));
                 }
-            });
+            };
 
-            RegisterCommandHandlers(requestResponseSocket);
+            RegisterCommandHandlers(requestResponseHandler);
 
-            requestResponseSocket.BindToPort(inPort);
-
-            return requestResponseSocket;
+            requestResponseHandler.BindToPort(inPort);
         }
-        public void Run(string[] args)
+
+        /// <summary>
+        /// SetupChatRoom
+        /// </summary>
+        /// <param name="inPort"></param>
+        /// <param name="chatRoom"></param>
+        void SetupChatRoom(string inPort, IChatRoom chatRoom)
+        {
+            chatRoom.BindToPort(inPort);
+
+            // After we notified all clients about the shut down, the server will stop
+            chatRoom.OnMessageSent += commandAndPayload => {
+                if (commandAndPayload.Command == NetworkCommands.kShutDownServerCMD)
+                {
+                    Thread.Sleep(500);
+                    m_poller.Stop();
+                }
+            };
+        }
+
+        public void Run(string[] args, ICommandHandler requestResponseHandler, IChatRoom chatRoom)
         {
             // Read command line args to determine the port number
             var port = "0";
@@ -165,28 +137,20 @@ namespace server
                 port = args[0].Substring(1);
             }
 
-            var requestResponseSocket = CreateRequestResponseChannel(port);
+            SetupRequestResponseChannel(port, requestResponseHandler);
+            Console.WriteLine(String.Format("Starting at port {0}", port));
 
-            Console.WriteLine("Starting at port " + port);
+            m_chatRoom = chatRoom;
+            SetupChatRoom(m_chatRoomPort, chatRoom);
 
-                using (var chatRoomSocket = new PublisherSocket())
-                {
-                    chatRoomSocket.Bind("tcp://*:" + m_chatRoomPort);
+            Console.WriteLine(String.Format("Message pipe: {0}", m_chatRoom.GetEndpoint()));
 
-                    Console.WriteLine("Message pipe: " + chatRoomSocket.Options.LastEndpoint);
+            // Determine the given port from the sockopt
+            m_chatRoomPort = m_chatRoom.GetEndpoint().Split(':')[2];
 
-                    // Determine the given port from the sockopt
-                    m_chatRoomPort = chatRoomSocket.Options.LastEndpoint.Split(':')[2];
+            m_poller = new NetMQPoller { m_chatRoom.GetPollableHandle(), requestResponseHandler.GetPollableHandle() };
 
-                    using (poller = new NetMQPoller { chatRoomSocket, requestResponseSocket.GetHandle() })
-                    {
-                        
-                        chatRoomSocket.SendReady += new EventHandler<NetMQSocketEventArgs>(pubSocket_SendReady);
-
-                        poller.Run();
-                    }
-                }
-            
+            m_poller.Run();
         }
     }
 }

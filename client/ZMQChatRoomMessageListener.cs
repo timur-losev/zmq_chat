@@ -27,7 +27,7 @@ namespace client.impl
         /// <param name="chatRoomPort"></param>
         /// <param name="onNewMessage"></param>
         /// <returns></returns>
-        private async Task CommandHandlerAsync(string chatRoomPort, System.Action<CommandAndPayload> onNewMessage)
+        private async Task CommandHandlerAsync(CancellationToken cancellationToken, string chatRoomPort, System.Action<CommandAndPayload> onNewMessage)
         {
             m_chatRoomSocket = new SubscriberSocket();
 
@@ -35,7 +35,7 @@ namespace client.impl
             m_chatRoomSocket.Connect(endpoint);
             m_chatRoomSocket.SubscribeToAnyTopic();
 
-            while (true)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 var (cmd, more) = await m_chatRoomSocket.ReceiveFrameStringAsync();
 
@@ -61,7 +61,7 @@ namespace client.impl
             // Make use of NetMQRuntime in order to handle async operations on ZMQ socket
             using (var runtime = new NetMQRuntime())
             {
-                runtime.Run(cancellationToken, CommandHandlerAsync(chatRoomPort, onNewMessage));
+                runtime.Run(cancellationToken, CommandHandlerAsync(cancellationToken, chatRoomPort, onNewMessage));
             }
         }
     }

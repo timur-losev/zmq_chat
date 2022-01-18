@@ -46,12 +46,12 @@ namespace client.impl
                 {
                     if (m_commandQueue.TryDequeue(out data))
                     {
-                            // Try sending command to the server
-                            bool isConnectionStillAlive = TryRequestResponse(data, onResponse);
+                        // Try sending command to the server
+                        bool isConnectionStillAlive = TryRequestResponse(data, onResponse);
                         if (!isConnectionStillAlive)
                         {
-                                // If timeout or error, break this thread
-                                onConnectionLost?.Invoke();
+                            // If timeout or error, break this thread
+                            onConnectionLost?.Invoke();
                             break;
                         }
                     }

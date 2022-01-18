@@ -11,19 +11,12 @@ using common;
 namespace server.impl
 {
     using CommandHandlerSignature = Func<string, CommandAndPayload>;
-    public class ZMQRequestResponseSocketWrapper
+    public class ZMQRequestResponseCommandHandler: ICommandHandler
     {
-        public delegate void OnCommandSentDelegate(CommandAndPayload data);
-
         private Dictionary<string, CommandHandlerSignature> m_commandHandlers = new Dictionary<string, CommandHandlerSignature>();
         private Queue<CommandAndPayload> m_communicationQueue = new Queue<CommandAndPayload>();
-        private OnCommandSentDelegate m_onCommandSentDelegate = null;
-        private RequestSocket m_requestResponseSocket = new RequestSocket();
-
-        public ZMQRequestResponseSocketWrapper(OnCommandSentDelegate onCommandSent = null)
-        {
-            m_onCommandSentDelegate = onCommandSent;
-        }
+        private ResponseSocket m_requestResponseSocket = new ResponseSocket();
+        public System.Action<CommandAndPayload> OnCommandSent { get; set; }
 
         public void BindToPort(string portString)
         {
@@ -34,10 +27,10 @@ namespace server.impl
         }
 
         /// <summary>
-        /// Return "native" handle
+        /// Returns a "native" handle
         /// </summary>
         /// <returns></returns>
-        public RequestSocket GetHandle()
+        public ISocketPollable GetPollableHandle()
         {
             return m_requestResponseSocket;
         }
@@ -50,6 +43,15 @@ namespace server.impl
         public void RegisterCommandHandler(string cmd, CommandHandlerSignature onNewCommand)
         {
             m_commandHandlers[cmd] = onNewCommand;
+        }
+
+        /// <summary>
+        /// Unregister command handler
+        /// </summary>
+        /// <param name="cmd"></param>
+        public void UnRegisterCommandHandler(string cmd)
+        {
+            m_commandHandlers.Remove(cmd);
         }
 
         /// <summary>
@@ -91,7 +93,7 @@ namespace server.impl
                 var cmd = m_communicationQueue.Dequeue();
                 e.Socket.SendMoreFrame(cmd.Command).SendFrame(cmd.Payload);
 
-                m_onCommandSentDelegate?.Invoke(cmd);
+                OnCommandSent?.Invoke(cmd);
             }
         }
     }

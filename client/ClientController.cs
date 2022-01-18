@@ -118,8 +118,10 @@ namespace client
                                         case NetworkCommands.kShutDownServerCMD:
                                             {
                                                 onServerShutDown?.Invoke();
-                                                // Close chat room
-                                                return;
+
+                                                // Close the chat room
+                                                m_ctsChatRoom.Cancel();
+                                                break;
                                             }
                                     }
                                 });

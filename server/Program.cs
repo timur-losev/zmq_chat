@@ -11,7 +11,7 @@ namespace server
         static void Main(string[] args)
         {
             ServerController server = new ServerController();
-            server.Run(args);
+            server.Run(args, new impl.ZMQRequestResponseCommandHandler(), new impl.ZMQChatRoom());
         }
     }
 }
